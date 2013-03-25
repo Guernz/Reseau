@@ -1,6 +1,7 @@
 package TFTP;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -9,102 +10,95 @@ import java.util.*;
 
 public class tftp {
 
-	public static void main(String[] args) {
-	/*	
-		//DÈclaration variables
-		Scanner sc = new Scanner(System.in);
-		int perteDonnees, port;
-		boolean avecPerteDonnees = true, ok = false;
+	static byte[] data = new byte[516];
+	static DatagramPacket outBound = new DatagramPacket(data, data.length);
 	
-		//Demande a l'utilisateur si avec ou sans perte de donnees
-		System.out.println("Veuillez saisir \"1\" pour activer la gestion de pertes de donnÈes, \"0\" sinon :");
-		while(!ok){
-			try{
-				perteDonnees = sc.nextInt();
-				if(perteDonnees == 0){
-					avecPerteDonnees =  false;
-					System.out.println("OK, sans gestion de pertes de donnÈes.");
-					ok = true;
-				}
-				if(perteDonnees == 1){
-					avecPerteDonnees =  true;
-					System.out.println("OK, avec gestion de pertes de donnÈes.");
-					ok = true;
-				}
-				if(perteDonnees != 0 && perteDonnees != 1){
-					System.out.println("Erreur, veuillez saisir \"1\" pour la gestion de pertes de donnÈes, \"0\" sinon :");
-				}
-			}
-			catch (InputMismatchException e){
-				System.out.println("Erreur, il faut saisir un entier \"1\" pour la gestion de pertes de donnÈes, \"0\" sinon.");
-				System.exit(0);
-			}
-		}
-		System.out.println(" ");
+	public static int convertirStringEnBytes(byte[] table, int pos, String n) {
+		for (int i = 0 ; i < n.length() ; i++){
+		    table[pos] = (byte) n.charAt(i) ;
+	            pos++;
+	        }
+		table[pos++] = 0 ;
+		return pos ;
+	    }
+	
+	public static void main(String[] args) throws IOException {
 		
-		//Demande a l'utilisateur le port de connexion
-		ok = false;
-		System.out.println("Veuillez saisir le port de connexion :");
-		while(!ok){
-			try{
-				port = sc.nextInt();
-				if (port < 0){
-					System.out.println("Veuillez saisir un port positif :");
-				}
-				if (port > 65536){
-					System.out.println("Veuillez saisir un port infÈrieur ‡ 65536 :");
-				}
-				if (port >= 0 && port <= 65535){
-					ok = true;
-					System.out.println("OK, port de connexion " + port + ".");
-				}	
-			}
-			catch (InputMismatchException e){
-				System.out.println("Erreur, il faut saisir un entier pour indiquer le port de connexion.");
-				System.exit(0);
-			}
-		}
-		
-		//Sans la gestion des pertes de donnÈes
-		if(!avecPerteDonnees){
-			
-		}
-		
-		//Avec la gestion des pertes de donnÈes
-		if(avecPerteDonnees){
-			
-		}
-	*/
-		
-		
-		DatagramSocket socket = null;
-        InetAddress tftp_server = null;
-        String host = "1024";
+		DatagramSocket socket = new DatagramSocket();
+		String host = "127.0.0.1";
+		int port = 2000;
+		InetAddress tftp_server = InetAddress.getByName(host);
         
-        //Connexion au serveur
-		try {
-            tftp_server = InetAddress.getByName(host);
-            socket = new DatagramSocket();
-        }
-        catch (IOException ex) {
-            System.err.println(ex);
-            System.exit(1);
-        }
-		System.out.println("Connexion au serveur réussi");
-		
+		FileOutputStream fichier = new FileOutputStream("recu");
+        
+        
 		//Récupération des fichiers
-		String request = "";
-		String fileName = "special_read";
-		DatagramPacket outBound;
-	    DatagramPacket inBound;
+		String fileName = "internet.jpg";
+	    
 		
-		request = createData(1, fileName, 1).toByteArray();
-        outBound = new DatagramPacket(request, request.length(), tftp_server, 69);
+	    
+	    //Mode Read
+	    data[0] = 0;
+	    data[1] = 1;
+	    int pos = convertirStringEnBytes(data,2,fileName);
+	    convertirStringEnBytes(data,pos,"octet");
+	    System.out.println("taille du tableau : "+data.length);
+	    
+        outBound = new DatagramPacket(data, data.length, tftp_server, port);
         socket.send(outBound);
 
 		
+		int numeroBlock = 1;
 		
-		//sc.close();
+		data = new byte[516];
+    	outBound = new DatagramPacket(data, data.length);
+    	socket.receive(outBound);
+		
+		
+        while(outBound.getLength() == 516){
+        	fichier.write(data, 4 ,data.length - 4);
+    		data = new byte[4];
+    		data[0] = 0;
+    		data[1] = 4;
+    		
+    			data[2] = (byte) (numeroBlock / 512);
+        		data[3] = (byte) (numeroBlock % 512);
+        		
+        	String dataCode = new String().valueOf(data[2] + data[3]);	
+    		System.out.println(dataCode);
+    		
+    		outBound = new DatagramPacket(data, 4, tftp_server, port); 
+    		socket.send(outBound);
+    		numeroBlock++;
+    		
+    		data = new byte[516];
+        	outBound = new DatagramPacket(data, data.length);
+        	socket.receive(outBound);	
+        }
+        fichier.write(data, 4 ,data.length - 4);
+        
+        data = new byte[4];
+		data[0] = 0;
+		data[1] = 4;
+		//String dataCode = new String().valueOf(data[2] + data[3]);	
+		System.out.println(numeroBlock);
+		data[2] = (byte) (numeroBlock / 512);
+		data[3] = (byte) (numeroBlock % 512);
+		outBound = new DatagramPacket(data, 4, tftp_server, port); 
+		socket.send(outBound);
+        
+        /*
+         *  - Connection entre les deux machines
+         *  - Transfert commence en envoyant un paquet (WRQ pour écrire un fichier ou RRQ pour lire un fichier)
+         *  - Le client et le serveur génère aléatoirement un TID (Transfert ID)
+         *  
+         *  - Perte d'un paquet, détectable par un temps d'attente trop long (timeout)
+         *  - Envoie d'un paquet d'erreur (error packet) entraine l'arret de l'envoi
+         *   
+         */
+        
+		
+	
 
 	}
 
