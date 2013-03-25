@@ -9,10 +9,23 @@ import java.net.InetAddress;
 import java.util.*;
 
 public class tftp {
-
+	
+	//Variable globales correspondant au code/mode/taille
+    final static int MODE_NETASCII = 0;
+    final static int MODE_BINARY = 1;
+    final static int OP_RRQ = 1;
+    final static int OP_WRQ = 2;
+    final static byte OP_DATAPACKET = 3;
+    final static byte OP_ACK = 4;
+    final static byte OP_ERROR = 5;
+    final static int PACKET_SIZE = 516;
 	static byte[] data = new byte[516];
 	static DatagramPacket outBound = new DatagramPacket(data, data.length);
 	
+	/*
+	 * Converti un string en byte et renvoie la position suivant le dernier caractère
+	 * Exemple : convertirStringEnBytes("test") renvoit 4
+	 */
 	public static int convertirStringEnBytes(byte[] table, int pos, String n) {
 		for (int i = 0 ; i < n.length() ; i++){
 		    table[pos] = (byte) n.charAt(i) ;
@@ -21,6 +34,37 @@ public class tftp {
 		table[pos++] = 0 ;
 		return pos ;
 	    }
+	
+	/*
+	 * Vérifie que la saisie est bien une chaine de caractères et renvoit la chaine
+	 */
+	public static String saisieString(){
+		String string = "";
+		Scanner scanString = new Scanner(System.in);
+		boolean ok = false;
+		
+		while (ok == false){
+			try{
+				string= scanString.nextLine();
+				ok = true;
+			}
+			catch(Exception e){
+				System.out.println("Saisie d'un string incorrect. Veuillez réessayer : ");
+				scanString.nextLine();
+				ok = false;
+			}
+		}
+		
+		return string;
+	}
+	
+	/*
+	 * Méthode GET qui permet de récupérer des fichiers
+	 */
+	public static void recupererFichier(){
+		
+	}
+	
 	
 	public static void main(String[] args) throws IOException {
 		
@@ -33,40 +77,38 @@ public class tftp {
         
         
 		//Récupération des fichiers
-		String fileName = "internet.jpg";
-	    
-		
-	    
-	    //Mode Read
+		//Demande le choix à l'utilisateur à la fin (à implémenter)
+		String fileName = "rfc1350.txt";
+	     
+	    //Composition de la première trame pour demander l'envoie de paquet
 	    data[0] = 0;
 	    data[1] = 1;
 	    int pos = convertirStringEnBytes(data,2,fileName);
 	    convertirStringEnBytes(data,pos,"octet");
-	    System.out.println("taille du tableau : "+data.length);
 	    
+	    //Envoie de la première trame
         outBound = new DatagramPacket(data, data.length, tftp_server, port);
         socket.send(outBound);
 
-		
+        //Récupération du premier block
 		int numeroBlock = 1;
-		
 		data = new byte[516];
     	outBound = new DatagramPacket(data, data.length);
     	socket.receive(outBound);
 		
-		
+    	//Tant qu'on n'atteint pas le dernier paquet (poids de celui-ci < 256)
         while(outBound.getLength() == 516){
+        	//On écrit dans le fichier la données sans les 4 premiers octets (Code bloc et num bloc)
         	fichier.write(data, 4 ,data.length - 4);
-    		data = new byte[4];
+    		
+        	//Composition de la trame ACK à envoyer
+        	data = new byte[4];
     		data[0] = 0;
-    		data[1] = 4;
-    		
-    			data[2] = (byte) (numeroBlock / 512);
-        		data[3] = (byte) (numeroBlock % 512);
-        		
-        	String dataCode = new String().valueOf(data[2] + data[3]);	
-    		System.out.println(dataCode);
-    		
+    		data[1] = 4;		
+			data[2] = (byte) (numeroBlock / 512); //512 car octets
+    		data[3] = (byte) (numeroBlock % 512);
+        	
+    		//Envoie de la trame qui confirme la réception du paquet 
     		outBound = new DatagramPacket(data, 4, tftp_server, port); 
     		socket.send(outBound);
     		numeroBlock++;
@@ -81,7 +123,6 @@ public class tftp {
 		data[0] = 0;
 		data[1] = 4;
 		//String dataCode = new String().valueOf(data[2] + data[3]);	
-		System.out.println(numeroBlock);
 		data[2] = (byte) (numeroBlock / 512);
 		data[3] = (byte) (numeroBlock % 512);
 		outBound = new DatagramPacket(data, 4, tftp_server, port); 
