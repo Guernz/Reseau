@@ -170,6 +170,7 @@ public class pop3 {
 			System.out.println("2 : Quitter.");
 			try{
 				//saisie clavier du choix du menu
+				sc = new Scanner(System.in);
 				choix=sc.nextInt();
 				switch(choix){
 				//consulter les messages

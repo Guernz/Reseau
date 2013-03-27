@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 
@@ -25,13 +26,14 @@ public class tftp {
 	static byte[] data = new byte[PACKET_SIZE];
 	static DatagramPacket outBound = null;
 	final static String host = "127.0.0.1";
-	static int port = 2000;
+	static int port;
 	static FileOutputStream fichierRead = null;
 	static FileInputStream fichierWrite = null;
 	static String fileName = "";
 	static DatagramSocket socket = null;
 	static InetAddress tftpServer = null;
 	static int numeroBloc = 1;
+	static Scanner sc = new Scanner(System.in);
 	
 	//Converti un string en byte et renvoie la position suivant le dernier caractère, Exemple : convertirStringEnBytes("test") renvoit 4
 	public static int convertirStringEnBytes(byte[] table, int pos, String n) {
@@ -44,76 +46,34 @@ public class tftp {
 	    }
 	
 	//Vérifie que la saisie est bien une chaine de caractères et renvoie celui-ci
-	public static String saisieString(){
+	public static String saisieString(String affiche){
 		String string = "";
-		Scanner scanString = new Scanner(System.in);
 		boolean ok = false;
 		
-		while (ok == false){
+		while (!ok){
+			System.out.println(affiche);
 			try{
-				string= scanString.nextLine();
+				sc = new Scanner(System.in);
+				string= sc.nextLine();
 				ok = true;
 			}
 			catch(Exception e){
-				System.out.println("Saisie d'un string incorrect. Veuillez réessayer : ");
-				scanString.nextLine();
-				ok = false;
+				System.out.println("Saisie d'un string incorrect.");
 			}
 		}
-		
 		return string;
 	}
 	
-	//Vérifie que la saisie est bien un entier et renvoie celui-ci
-	public static int saisieInt(){
-		int entier = 0;
-		Scanner scanString = new Scanner(System.in);
-		boolean ok = false;
-		
-		while (ok == false){
-			try{
-				entier = scanString.nextInt();
-				ok = true;
-			}
-			catch(Exception e){
-				System.out.println("Saisie d'un entier incorrecte. Veuillez réessayer : ");
-				scanString.nextLine();
-				ok = false;
-			}
-		}
-		return entier;
-	}
-	
-	//Conversion un tableau de 2 byte en un entier  
-	public static int convertirByteEnEntier2(byte b[]){
-		int valRetour = 0;
-		
-		valRetour = b[1] << 8 + b[0];
-		valRetour = valRetour / 256;
 
-		return valRetour;
-	}
-	
-	//Permet le choix de port de connexion et vérifie sa validité
-	public static void choixPort(){
-		System.out.println("Veuillez saisir le port de connexion : ");
-		while(port<1024 || port>65535){
-			port = saisieInt();
-			if(port<1024 || port>65535){
-				System.out.println("Le numéro de port doit être compris entre 1024 et 65 535 inclus");
-			}
-		}	
-	}
-	
 	//Méthode établissant la connexion avec le serveur dans le cas d'un READ
 	public static void connexionRead() throws IOException{
 		String nomFichier = "";
-		System.out.println("Veuillez saisir le nom du fichier qui sera sauvegarder : ");
-		nomFichier = saisieString();
+		String affiche = "Veuillez saisir le nom du fichier qui sera sauvegard� : ";
+		nomFichier = saisieString(affiche);
 		fichierRead = new FileOutputStream(nomFichier);
 
-		System.out.println("Quelle fichier voulez-vous télécharger sur le serveur : ");
-		fileName = saisieString();
+		affiche = "Quel fichier voulez-vous t�l�charger sur le serveur : ";
+		fileName = saisieString(affiche);
 		
 		socket = new DatagramSocket();
 		tftpServer = InetAddress.getByName(host);
@@ -124,13 +84,13 @@ public class tftp {
 	
 	//Méthode établissant la connexion avec le serveur dans le cas d'un WRITE (retourne 1 si connexion OK, sinon -1) 
 	public static int connexionPut() throws IOException{
-		System.out.println("Veuillez saisir le nom du fichier à envoyer sur le serveur : ");
-		fileName = saisieString();
+		String affiche = "Veuillez saisir le nom du fichier � envoyer sur le serveur : ";
+		fileName = saisieString(affiche);
 		try{
 			fichierWrite = new FileInputStream(fileName);
 		}
 		catch(FileNotFoundException e){
-			System.out.println("Le fichier '" + fileName + "' n'existe pas");
+			System.out.println("Le fichier '" + fileName + "' n'existe pas.");
 			return -1;
 		}
 		socket = new DatagramSocket();
@@ -206,25 +166,25 @@ public class tftp {
 			else if(b[1] == 5){
 				valRetour = 5; //Erreur
 				if(b[3] == 0){
-					System.out.println("Erreur non défini");
+					System.out.println("Erreur non d�fini");
 				}
 				else if(b[3] == 1){
-					System.out.println("ERREUR : Fichier non trouvé");
+					System.out.println("ERREUR : Fichier non trouv�");
 				}
 				else if(b[3] == 2){
-					System.out.println("ERREUR : Violation de l'accès");
+					System.out.println("ERREUR : Violation de l'acc�s");
 				}
 				else if(b[3] == 3){
 					System.out.println("ERREUR : Disque plein");
 				}
 				else if(b[3] == 4){
-					System.out.println("ERREUR : Opération TFTP illégale");
+					System.out.println("ERREUR : Op�ration TFTP ill�gale");
 				}
 				else if(b[3] == 5){
 					System.out.println("ERREUR : Transfert ID inconnu");
 				}
 				else if(b[3] == 6){
-					System.out.println("ERREUR : Le fichier existe déjà");
+					System.out.println("ERREUR : Le fichier existe d�j�");
 				}
 				else if(b[3] == 7){
 					System.out.println("ERREUR : Utilisateur inconnu");
@@ -260,16 +220,24 @@ public class tftp {
         		fichierRead.close();
         		return;
         	}
-        	fichierRead.write(data, 4 ,data.length - 4);
-        	envoyerTrame(compositionTrameACK(numeroBloc));
-    		numeroBloc++;
-    		recevoirTrame();
+        	if(data[3] == numeroBloc){
+	        	fichierRead.write(data, 4 ,data.length - 4);
+	        	envoyerTrame(compositionTrameACK(numeroBloc));
+	    		numeroBloc++;
+	    		recevoirTrame();	
+        	}
+        	else {
+        		envoyerTrame(compositionTrameACK(numeroBloc-1));
+	    		recevoirTrame();
+        	}
+
         }
         fichierRead.write(data, 4 ,data.length - 4);
         envoyerTrame(compositionTrameACK(numeroBloc)); 
         fichierRead.close();
         socket.close();
 	}
+	
 	
 	//Méthode permettant d'envoyer des fichiers sur le serveur
 	public static void envoyerFichier() throws IOException{
@@ -281,155 +249,94 @@ public class tftp {
 		if(connexionPut()==-1){
 			return;
 		}
-		System.out.println("test");
+		
+			
 		//On lit le fichier par paquet de longueur de trame DATA qu'on envoit sur le serveur une fois formaté en trame
-		while((tailleBuffer = fichierWrite.read(bufferFichier)) >= 0){
+
+		
+		while((tailleBuffer = fichierWrite.read(bufferFichier)) >= 0){	
 			recevoirTrame();
-			System.out.println(numeroBloc);
 			if(analyseTypeTrame(data)!= 4){
-				System.out.println("Le serveur n'a pas reçu la trame de composition ");
+				System.out.println("Le serveur n'a pas re�u la trame de composition ");
+        		return;
+			}
+			System.out.println("data[3] " + data[3]);
+			if (data[3]==numeroBloc){
+				System.out.println("paquet " + numeroBloc + " recu par le serveur");
+				numeroBloc++;
 			}
 			else{
-				numeroBloc++;
-				data = compositionTrameDATA(numeroBloc, bufferFichier, tailleBuffer+4);
-				envoyerTrame(data);
+				while(data[3]!=numeroBloc){
+					System.out.println("test 1");
+					envoyerTrame(data);
+					System.out.println("test 2");
+					recevoirTrame();				//probl�me ici sur le recevoirTrame 
+					
+				}
 			}
+			data = compositionTrameDATA(numeroBloc, bufferFichier, tailleBuffer+4);
+			envoyerTrame(data);
+			
 		}
-		
 		//On récupère le dernier ACK du serveur
 		recevoirTrame();
-		numeroBloc++;
 	}
 	
 	//Ancienne méthode (à supprimer) sans la factorisation avec les méthodes pour "mieux comprendre"
-	public static void recupererFichierAvecErreur() throws IOException{
-		String fileName = "rfc1350.txt";
-		FileOutputStream fichier = new FileOutputStream("recu");
-		DatagramSocket socket = new DatagramSocket();
-		
-		InetAddress tftp_server = InetAddress.getByName(host);
-        
-		
-		//Composition de la première trame pour demander l'envoie de paquet
-	    data[0] = 0;
-	    data[1] = 1;
-	   
-	    int pos = convertirStringEnBytes(data,2,fileName);
-	    convertirStringEnBytes(data,pos,"octet");
-	    
-	    //Envoie de la première trame
-        outBound = new DatagramPacket(data, data.length, tftp_server, port);
-        socket.send(outBound);
-
-        //Récupération du premier block
-		int numeroBlock = 1;
-		int numeroBlockSuivant = numeroBlock + 1;
-		data = new byte[516];
-    	outBound = new DatagramPacket(data, data.length);
-    	socket.receive(outBound);
-		
-    	byte codeOp[];
-    	byte numBlock[];
-    	//Tant qu'on n'atteint pas le dernier paquet (poids de celui-ci < 256)
-        while(outBound.getLength() == 516){
-        	//Récupération du code opération de la trame reçue
-        	codeOp = new byte[2];
-        	codeOp[1] = outBound.getData()[1];
-        	
-        	//Récupération du numero du block de la trame reçue
-        	numBlock = new byte[2];
-        	numBlock[0] = outBound.getData()[2];
-        	numBlock[1] = outBound.getData()[3];
-        	int result = convertirByteEnEntier2(numBlock);
-        			
-        	//Analyse de l'en-tête du paquet
-        	if ((int) codeOp[1] == 5){ 
-        		System.out.println("Erreur.");
-        		fichier.close();
-        		System.exit(0);
-        	}
-        	else if ((int) codeOp[1] == 3){
-        		
-        	
-	        	//On écrit dans le fichier la données sans les 4 premiers octets (Code bloc et num bloc)
-	        	fichier.write(data, 4 ,data.length - 4);
-	    		
-	        	//Composition de la trame ACK à envoyer
-	        	data = new byte[4];
-	    		data[0] = 0;
-	    		data[1] = 4;		
-				data[2] = (byte) (numeroBlock / 512); //512 car octets
-	    		data[3] = (byte) (numeroBlock % 512);
-	        	
-	    		//Envoie de la trame qui confirme la réception du paquet 
-	    		outBound = new DatagramPacket(data, 4, tftp_server, port); 
-	    		socket.send(outBound);
-	    		numeroBlock++;
-	    		
-	    		data = new byte[516];
-	        	outBound = new DatagramPacket(data, data.length);
-	        	socket.receive(outBound);
-        	}
-	    }
-        
-        codeOp = new byte[2];
-    	codeOp[1] = outBound.getData()[1];
-        if ((int) codeOp[1] == 5){ 
-    		
-    	}
-    	else if ((int) codeOp[1] == 3){
-	        
-	        fichier.write(data, 4 ,data.length - 4);
-	        
-	        data = new byte[4];
-			data[0] = 0;
-			data[1] = 4;	
-			data[2] = (byte) (numeroBlock / 512);
-			data[3] = (byte) (numeroBlock % 512);
-			outBound = new DatagramPacket(data, 4, tftp_server, port); 
-			socket.send(outBound);
-    	}
-	}
-	
-	//Méthode affichant l'interface principal de l'application
-	public static void afficherInterface(){
-		System.out.println("===============================================");
-		System.out.println("                 PROJET RESEAU                 ");
-		System.out.println("===============================================");
-		System.out.println();
-		System.out.println("Que voulez-vous faire ?");
-		System.out.println("1. Utiliser le client POP3");
-		System.out.println("2. Envoyer un fichier sur le serveur");
-		System.out.println("3. Recupérer un fichier sur le serveur");
-		System.out.println("4. Quitter");
-		System.out.println();
-	}
 
 	
 	public static void main(String[] args) throws IOException {
+		
+		boolean quitte = false;
 		int choix = 0;
-
-		while (choix != 4){
-			afficherInterface();
-			choix = saisieInt();
-			switch(choix){
-			case 1 : 
-				
-				break;
-			case 2 : 
-				envoyerFichier();
-				break;
-			case 3 : 
-				recupererFichier();
-				break;
-			case 4 : 
-				System.out.println("Au revoir");
-				break;
-			default : 
-				System.out.println("Les choix possibles vont de 1 à 3.\n");
-				break;
+		
+		//Demande du port de connexion pour le serveur
+		while(port<1024 || port>65535){
+			System.out.println("Veuillez saisir le port de connexion : ");
+			try{
+				sc = new Scanner(System.in);
+				port = sc.nextInt();
+				if(port<1024 || port>65535){
+					System.out.println("Le num�ro de port doit �tre compris entre 1024 et 65 535 inclus.");
+				}
+			}
+			catch (InputMismatchException e){
+				System.out.println("Erreur. Vous n'avez pas saisie un entier.");
 			}
 		}
+
+		//menu
+		while (!quitte){
+			System.out.println("\n===============================================");
+			System.out.println("                 PROJET RESEAU                 ");
+			System.out.println("===============================================");
+			System.out.println();
+			System.out.println("Que voulez-vous faire ?");
+			System.out.println("1. Envoyer un fichier sur le serveur");
+			System.out.println("2. Recup�rer un fichier sur le serveur");
+			System.out.println("3. Quitter");
+			System.out.println();
+			try {
+				sc = new Scanner(System.in);
+				choix = sc.nextInt();
+				switch(choix){
+				case 1 : 
+					envoyerFichier();
+					break;
+				case 2 : 
+					recupererFichier();
+					break;
+				case 3: 
+					System.out.println("Au revoir");
+					quitte = true;
+					break;
+				}
+			}
+			catch (InputMismatchException e){
+				System.out.println("Erreur. Les choix possibles vont de 1 �3.\n");
+			}
+		}
+		sc.close();
 				
 		
    
