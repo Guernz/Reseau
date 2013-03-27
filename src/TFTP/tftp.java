@@ -1,15 +1,13 @@
 package TFTP;
 
-import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.*;
+import java.util.Scanner;
 
 
 public class tftp {
@@ -28,7 +26,8 @@ public class tftp {
 	static DatagramPacket outBound = null;
 	final static String host = "127.0.0.1";
 	static int port = 2000;
-	static FileOutputStream fichier = null;
+	static FileOutputStream fichierRead = null;
+	static FileInputStream fichierWrite = null;
 	static String fileName = "";
 	static DatagramSocket socket = null;
 	static InetAddress tftpServer = null;
@@ -111,13 +110,34 @@ public class tftp {
 		String nomFichier = "";
 		System.out.println("Veuillez saisir le nom du fichier qui sera sauvegarder : ");
 		nomFichier = saisieString();
-		fichier = new FileOutputStream(nomFichier);
+		fichierRead = new FileOutputStream(nomFichier);
 
 		System.out.println("Quelle fichier voulez-vous télécharger sur le serveur : ");
 		fileName = saisieString();
 		
 		socket = new DatagramSocket();
 		tftpServer = InetAddress.getByName(host);
+		
+		data = compositionTrameRW(1);
+		envoyerTrame(data);
+	}
+	
+	//Méthode établissant la connexion avec le serveur dans le cas d'un WRITE (retourne 1 si connexion OK, sinon -1) 
+	public static int connexionPut() throws IOException{
+		System.out.println("Veuillez saisir le nom du fichier à envoyer sur le serveur : ");
+		fileName = saisieString();
+		try{
+			fichierWrite = new FileInputStream(fileName);
+		}
+		catch(FileNotFoundException e){
+			System.out.println("Le fichier '" + fileName + "' n'existe pas");
+			return -1;
+		}
+		socket = new DatagramSocket();
+		tftpServer = InetAddress.getByName(host);
+		data = compositionTrameRW(2);
+		envoyerTrame(data);
+		return 1;
 	}
 	
 	//Création de la première trame en fonction du paramètre (1 : READ, 2 : WRITE)
@@ -150,6 +170,20 @@ public class tftp {
 		return donneeACK;
 	}
 	
+	//Création de la trame DATA en fonction du numéro de bloc et des données
+	public static byte[] compositionTrameDATA(int num, byte[] donnees, int taille){
+		byte[] trameData = new byte[taille];
+		trameData[0] = 0;
+		trameData[1] = 3;		
+		trameData[2] = (byte) (num / 512);
+		trameData[3] = (byte) (num % 512);
+		
+		for(int i=4;i<taille;i++){
+			trameData[i] = donnees[i-4];
+		}
+		return trameData;
+	}
+		
 	//Analyse du type de trame reçu et renvoie un entier correspondant au type
 	public static int analyseTypeTrame(byte[] b){
 		int valRetour = 0;
@@ -200,13 +234,13 @@ public class tftp {
 		return valRetour;
 	}
 	
-	//Envoie une trame
+	//Envoyer une trame
 	public static void envoyerTrame(byte[] donnees) throws IOException{
 		outBound = new DatagramPacket(donnees, donnees.length, tftpServer, port);
         socket.send(outBound);
 	}
 	
-	//Reçoit une trame
+	//Recevoir une trame
 	public static void recevoirTrame() throws IOException{
 		data = new byte[PACKET_SIZE];
     	outBound = new DatagramPacket(data, data.length);
@@ -217,28 +251,57 @@ public class tftp {
 	public static void recupererFichier() throws IOException{
         boolean erreur = false;
 		connexionRead();
-        data = compositionTrameRW(1);
-        envoyerTrame(data);
+
 		int numeroBloc = 1;
-		recevoirTrame();
-		
+		recevoirTrame();		
         while(outBound.getLength() == 516 && erreur == false){
         	if(analyseTypeTrame(data)==5){
+        		socket.close();
+        		fichierRead.close();
         		return;
         	}
-        	fichier.write(data, 4 ,data.length - 4);
+        	fichierRead.write(data, 4 ,data.length - 4);
         	envoyerTrame(compositionTrameACK(numeroBloc));
     		numeroBloc++;
     		recevoirTrame();
         }
-        fichier.write(data, 4 ,data.length - 4);
+        fichierRead.write(data, 4 ,data.length - 4);
         envoyerTrame(compositionTrameACK(numeroBloc)); 
+        fichierRead.close();
         socket.close();
 	}
 	
+	//Méthode permettant d'envoyer des fichiers sur le serveur
+	public static void envoyerFichier() throws IOException{
+		byte[] bufferFichier = new byte[512];
+		int numeroBloc = 0;
+		int tailleBuffer = 0;
+		
+		//On vérifie que la connexion se passe correctement
+		if(connexionPut()==-1){
+			return;
+		}
+		System.out.println("test");
+		//On lit le fichier par paquet de longueur de trame DATA qu'on envoit sur le serveur une fois formaté en trame
+		while((tailleBuffer = fichierWrite.read(bufferFichier)) >= 0){
+			recevoirTrame();
+			System.out.println(numeroBloc);
+			if(analyseTypeTrame(data)!= 4){
+				System.out.println("Le serveur n'a pas reçu la trame de composition ");
+			}
+			else{
+				numeroBloc++;
+				data = compositionTrameDATA(numeroBloc, bufferFichier, tailleBuffer+4);
+				envoyerTrame(data);
+			}
+		}
+		
+		//On récupère le dernier ACK du serveur
+		recevoirTrame();
+		numeroBloc++;
+	}
 	
-
-	//Méthode GET qui permet de récupérer des fichiers
+	//Ancienne méthode (à supprimer) sans la factorisation avec les méthodes pour "mieux comprendre"
 	public static void recupererFichierAvecErreur() throws IOException{
 		String fileName = "rfc1350.txt";
 		FileOutputStream fichier = new FileOutputStream("recu");
@@ -278,11 +341,11 @@ public class tftp {
         	numBlock[0] = outBound.getData()[2];
         	numBlock[1] = outBound.getData()[3];
         	int result = convertirByteEnEntier2(numBlock);
-        	System.out.println("oj : " + result);
         			
         	//Analyse de l'en-tête du paquet
         	if ((int) codeOp[1] == 5){ 
         		System.out.println("Erreur.");
+        		fichier.close();
         		System.exit(0);
         	}
         	else if ((int) codeOp[1] == 3){
@@ -354,7 +417,7 @@ public class tftp {
 				
 				break;
 			case 2 : 
-				
+				envoyerFichier();
 				break;
 			case 3 : 
 				recupererFichier();
@@ -369,8 +432,7 @@ public class tftp {
 		}
 				
 		
-		
-        
+   
 		//Récupération des fichiers
 		//Demande le choix à l'utilisateur à la fin (à implémenter)
 		
