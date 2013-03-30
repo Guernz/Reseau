@@ -57,7 +57,7 @@ public class tftp {
 				string= sc.nextLine();
 				ok = true;
 			}
-			catch(Exception e){
+			catch(InputMismatchException e){
 				System.out.println("Saisie d'un string incorrect.");
 			}
 		}
@@ -252,38 +252,50 @@ public class tftp {
 		
 			
 		//On lit le fichier par paquet de longueur de trame DATA qu'on envoit sur le serveur une fois formaté en trame
-
-		
-		while((tailleBuffer = fichierWrite.read(bufferFichier)) >= 0){	
+		byte[] dataRenvoi = null;
+		while((tailleBuffer = fichierWrite.read(bufferFichier)) >= 0){
 			recevoirTrame();
+			System.out.println(numeroBloc);
 			if(analyseTypeTrame(data)!= 4){
-				System.out.println("Le serveur n'a pas re�u la trame de composition ");
-        		return;
-			}
-			System.out.println("data[3] " + data[3]);
-			if (data[3]==numeroBloc){
-				System.out.println("paquet " + numeroBloc + " recu par le serveur");
-				numeroBloc++;
+				System.out.println("Le serveur n'a pas re�u la trame de composition.");
+				return;
 			}
 			else{
-				while(data[3]!=numeroBloc){
-					System.out.println("test 1");
+				if(data[3]==numeroBloc){
+					System.out.println(numeroBloc + " recu par le serveur");
+					numeroBloc++;
+					System.out.println("envoi au serveur " + numeroBloc);
+					data = compositionTrameDATA(numeroBloc, bufferFichier, tailleBuffer+4);
+					dataRenvoi = data;
+					envoyerTrame(data); 
+				}
+				else{
+					System.out.println("renvoi " + numeroBloc);
+					while(data[3]!=numeroBloc){
+						envoyerTrame(dataRenvoi);
+						recevoirTrame();
+					}
+					System.out.println(numeroBloc + " recu par le serveur apres renvoi");
+					numeroBloc++;
+					data = compositionTrameDATA(numeroBloc, bufferFichier, tailleBuffer+4);
+					dataRenvoi=data;
 					envoyerTrame(data);
-					System.out.println("test 2");
-					recevoirTrame();				//probl�me ici sur le recevoirTrame 
-					
 				}
 			}
-			data = compositionTrameDATA(numeroBloc, bufferFichier, tailleBuffer+4);
-			envoyerTrame(data);
-			
 		}
+		
 		//On récupère le dernier ACK du serveur
 		recevoirTrame();
+		if(data[3]!=numeroBloc){
+			while(data[3]!=numeroBloc){
+				System.out.println("renvoi " + numeroBloc + " data " + data[3]);
+				envoyerTrame(dataRenvoi);
+				recevoirTrame();
+			}
+		}
+		System.out.println("dernier paquet " + numeroBloc + " recu par le serveur");
 	}
 	
-	//Ancienne méthode (à supprimer) sans la factorisation avec les méthodes pour "mieux comprendre"
-
 	
 	public static void main(String[] args) throws IOException {
 		
